@@ -94,4 +94,10 @@ contract SmartWallet is Ownable {
     function isNativeToken(address token) internal pure returns (bool) {
         return token == address(0);
     }
+
+    function balanceOf(address token) external view returns (uint) {
+        IStrategy strategy = IStrategy(tokenStrategy[token]);
+        return strategy.balanceOf(token, address(strategy));
+    }
+
 }

@@ -30,13 +30,14 @@ contract PtdStrategy is IStrategy {
 
     address public ptdBankAddr;
     address private _rewardsToken;
-    mapping(address => address) pTokenStakingPool;
+    PtdConfig public ptdConfig;
 
     address public owner;
 
-    constructor(PtdConfig ptdConfig, address _owner) public {
-        ptdBankAddr = ptdConfig.ptdBankAddr();
-        _rewardsToken = ptdConfig.rewardsToken();
+    constructor(PtdConfig _ptdConfig, address _owner) public {
+        ptdBankAddr = _ptdConfig.ptdBankAddr();
+        _rewardsToken = _ptdConfig.rewardsToken();
+        ptdConfig = _ptdConfig;
         owner = _owner;
     }
 
@@ -113,7 +114,7 @@ contract PtdStrategy is IStrategy {
     }
 
     function getStakingPool(address token) internal view returns (address) {
-        address stakingPool = pTokenStakingPool[token];
+        address stakingPool = ptdConfig.getStakingPool(token);
         require(stakingPool != address(0), "staking pool is not configured");
 
         return stakingPool;
