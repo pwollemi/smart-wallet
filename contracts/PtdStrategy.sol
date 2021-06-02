@@ -119,4 +119,6 @@ contract PtdStrategy is IStrategy {
 
         return stakingPool;
     }
+
+    receive() external payable {}
 }

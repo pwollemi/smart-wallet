@@ -69,7 +69,7 @@ contract SmartWallet is Ownable {
         }
     }
 
-     function claimRewardsInternal(address token) internal {
+    function claimRewardsInternal(address token) internal {
         require(tokenStrategy[token] != address(0), "SmartWallet: no token strategy configured");
 
         IStrategy strategy = IStrategy(tokenStrategy[token]);
@@ -100,4 +100,5 @@ contract SmartWallet is Ownable {
         return strategy.balanceOf(token, address(strategy));
     }
 
+    receive() external payable {}
 }
