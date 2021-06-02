@@ -2,18 +2,24 @@
 
 pragma solidity ^0.6.9;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
 import "./SmartWallet.sol";
-contract SmartWalletFactory {
+contract SmartWalletFactory is Ownable {
     mapping(address => SmartWallet) public walletStore;
+
+    address public walletImpl;
 
     event WalletCreated(address owner, address wallet);
 
-    function newSmartWallet(address globalConfig) external returns (address) {
-        SmartWallet smartWallet = new SmartWallet(globalConfig);
-        smartWallet.transferOwnership(msg.sender);
+    constructor(address _walletImpl) public {
+        walletImpl = _walletImpl;
+    }
 
+    function newSmartWallet(address globalConfig) external returns (address) {
+        SmartWallet smartWallet = SmartWallet(payable(Clones.clone(walletImpl)));
+        smartWallet.initialize(globalConfig);
         walletStore[msg.sender] = smartWallet;
 
         emit WalletCreated(msg.sender, address(smartWallet));

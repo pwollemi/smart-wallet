@@ -5,20 +5,22 @@ pragma solidity ^0.6.9;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import "./IStrategy.sol";
 import "./IStrategyFactory.sol";
 import "./GlobalConfig.sol";
 
-contract SmartWallet is Ownable {
+contract SmartWallet is OwnableUpgradeable {
     using SafeERC20 for IERC20;
 
     // each token has one specific strategy
     mapping(address => address) public tokenStrategy;
     GlobalConfig public globalConfig;
 
-    constructor(address _globalConfig) public {
+    function initialize(address _globalConfig) external initializer {
         globalConfig = GlobalConfig(_globalConfig);
+        __Ownable_init();
     }
 
     function setTokenStrategy(address token, string calldata productName) external payable onlyOwner {
