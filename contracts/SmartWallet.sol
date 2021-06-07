@@ -10,12 +10,15 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./IStrategy.sol";
 import "./IStrategyFactory.sol";
 import "./GlobalConfig.sol";
-
+/**
+ * @title SmartWallet is one tool for user to manage digital assets
+ * @author FilDA
+ */
 contract SmartWallet is OwnableUpgradeable {
     using SafeERC20 for IERC20;
 
-    // each token has one specific strategy
-    mapping(address => address) public tokenStrategy;
+    /// Each prod has one specific strategy
+    mapping(string => IStrategy) public investStrategy;
     GlobalConfig public globalConfig;
 
     function initialize(address _globalConfig) external initializer {
@@ -23,33 +26,61 @@ contract SmartWallet is OwnableUpgradeable {
         __Ownable_init();
     }
 
-    function setTokenStrategy(address token, string calldata productName) external payable onlyOwner {
-        address configuredStrategy = tokenStrategy[token];
-        if (configuredStrategy == address(0)) {
-            IStrategyFactory strategyFactory = IStrategyFactory(globalConfig.getStrategyFactory(productName));
-            address newStrategy = address(strategyFactory.newStrategy());
-            tokenStrategy[token] = newStrategy;
-        } else {
-            IStrategy oldStrategy = IStrategy(tokenStrategy[token]);
-            uint balance = oldStrategy.balanceOf(token, address(this));
-            if (balance > 0) {
-                oldStrategy.withdraw(token, balance);
-                claimRewardsInternal(token);
-            }
+    /**
+     * @notice Deposit Erc20 token from user's normal wallet to this smart wallet
+     * @dev Only Erc20 token is supported by this function
+     * @param token The address of the asset to be deposited
+     * @param amount The # of asset to be deposited
+     */
+    function depositErc20ToWallet(address token, uint amount) external {
+        require(token != address(0), "SmartWallet: zero address");
+        require(amount != 0, "SmartWallet: zero amount");
 
-            IStrategyFactory strategyFactory = IStrategyFactory(globalConfig.getStrategyFactory(productName));
-            IStrategy newStrategy = IStrategy(strategyFactory.newStrategy());
-            tokenStrategy[token] = address(newStrategy);
-            IERC20(token).approve(address(newStrategy), balance);
-
-            newStrategy.deposit{value:balance}(token, balance);
-        }
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
     }
 
-    function deposit(address token, uint amount) external payable onlyOwner {
-        require(tokenStrategy[token] != address(0), "SmartWallet: no token strategy configured");
+    /**
+     * @notice Get cash balance for any tokens saved in this smart wallet
+     * @dev Use zero address to get native token balance
+     * @param token The address of the asset to be queried
+     */
+    function getCashBalance(address token) external view returns (uint) {
+        if (isNativeToken(token)) {
+            return address(this).balance;
+        }
 
-        IStrategy strategy = IStrategy(tokenStrategy[token]);
+        return IERC20(token).balanceOf(address(this));
+    }
+
+    /**
+     * @notice Invest to specific production with assets saved in this smart wallet
+     * @dev Zero amount is not allowed
+     * @param token The token to be used for investment
+     * @param amount The amount to invest
+     * @param prod The production to invest
+     */
+    function investFromWallet(address token, uint amount, string calldata prod) external payable {
+        require(amount != 0, "SmartWallet: zero invest amount");
+
+        IStrategy currentStrategy = getInvestStrategy(prod);
+
+        if (!isNativeToken(token)) {
+            IERC20(token).approve(address(currentStrategy), amount);
+        }
+        currentStrategy.deposit{value:msg.value}(token, amount);
+    }
+
+    /**
+     * @notice Invest to specific production with assets from user's normal account
+     * @dev Zero amount is not allowed
+     * @param token The token to be used for investment
+     * @param amount The amount to invest
+     * @param prod The production to invest
+     */
+    function directInvest(address token, uint amount, string calldata prod) external payable onlyOwner {
+        require(amount != 0, "SmartWallet: zero invest amount");
+
+        IStrategy strategy = getInvestStrategy(prod);
         if (isNativeToken(token)) {
             amount = msg.value;
         } else {
@@ -59,10 +90,51 @@ contract SmartWallet is OwnableUpgradeable {
         strategy.deposit{value:msg.value}(token, amount);
     }
 
-    function withdraw(address token, uint amount) external onlyOwner {
-        require(tokenStrategy[token] != address(0), "SmartWallet: no token strategy configured");
+    // Get investment strategy with production name
+    function getInvestStrategy(string calldata prod) internal returns (IStrategy) {
+        if (address(investStrategy[prod]) == address(0)) {
+            require(globalConfig.getStrategyFactory(prod) != address(0), "SmartWallet: no strategy configured");
 
-        IStrategy strategy = IStrategy(tokenStrategy[token]);
+            IStrategyFactory strategyFactory = IStrategyFactory(globalConfig.getStrategyFactory(prod));
+            IStrategy newStrategy = strategyFactory.newStrategy();
+            investStrategy[prod] = newStrategy;
+        }
+        return investStrategy[prod];
+    }
+
+    /**
+     * @notice Get token balance saved in specific production
+     * @param token The token to be queried
+     * @param prod The production to invest
+     */
+    function investBalanceOf(address token, string calldata prod) external view returns (uint) {
+        IStrategy strategy = investStrategy[prod];
+        return strategy.balanceOf(token, address(strategy));
+    }
+
+    /**
+     * @notice Withdraw specific amount of token to this smart wallet
+     * @param token The token to withdraw
+     * @param amount The amount to withdraw
+     * @param prod The production to withdraw from
+     */
+    function withdrawToWallet(address token, uint amount, string calldata prod) external onlyOwner {
+        IStrategy strategy = investStrategy[prod];
+        require(address(strategy) != address(0), "SmartWallet: strategy not configured");
+
+        strategy.withdraw(token, amount);
+    }
+
+    /**
+     * @notice Withdraw specific amount of token to user's normal account
+     * @param token The token to withdraw
+     * @param amount The amount to withdraw
+     * @param prod The production to withdraw from
+     */
+    function directWithdraw(address token, uint amount, string calldata prod) external onlyOwner {
+        IStrategy strategy = investStrategy[prod];
+        require(address(strategy) != address(0), "SmartWallet: strategy not configured");
+
         strategy.withdraw(token, amount);
         if (token == address(0)) {// native token
             payable(owner()).transfer(amount);
@@ -71,35 +143,72 @@ contract SmartWallet is OwnableUpgradeable {
         }
     }
 
-    function claimRewardsInternal(address token) internal {
-        require(tokenStrategy[token] != address(0), "SmartWallet: no token strategy configured");
 
-        IStrategy strategy = IStrategy(tokenStrategy[token]);
+    /**
+     * @notice Withdraw specific amount of token to user's normal account from this smart wallet
+     * @param token The token to withdraw
+     * @param amount The amount to withdraw
+     */
+    function withdrawFromWallet(address token, uint amount) external onlyOwner {
+          if (token == address(0)) {// native token
+            payable(owner()).transfer(amount);
+        } else {
+            IERC20(token).transfer(owner(), amount);
+        }
+    }
+
+
+    /**
+     * @notice Claim rewards from specific production
+     * @param token The token to generate rewards
+     * @param prod The production to generate rewards
+     */
+    function claimRewardsInternal(address token, string calldata prod) internal {
+        IStrategy strategy = investStrategy[prod];
+        require(address(strategy) != address(0), "SmartWallet: strategy not configured");
+
         strategy.claimRewards(token);
+    }
+
+
+    /**
+     * @notice Claim rewards from specific production to this smart wallet
+     * @param token The token to generate rewards
+     * @param prod The production to generate rewards
+     */
+    function claimRewardsToWallet(address token, string calldata prod) external {
+        claimRewardsInternal(token, prod);
+    }
+
+    /**
+     * @notice Claim rewards from specific production to user's normal account
+     * @param token The token to generate rewards
+     * @param prod The production to generate rewards
+     */
+    function directClaimRewards(address token, string calldata prod) external {
+        IStrategy strategy = investStrategy[prod];
+        require(address(strategy) != address(0), "SmartWallet: strategy not configured");
+
+        claimRewardsInternal(token, prod);
         address rewardsToken = strategy.rewardsToken();
         uint rewardAmount = IERC20(rewardsToken).balanceOf(address(this));
         IERC20(rewardsToken).transfer(owner(), rewardAmount);
     }
 
-    function claimRewards(address token) external {
-        claimRewardsInternal(token);
-    }
+    /**
+     * @notice Get the rewards token address for specific production
+     * @param prod The production to generate rewards
+     */
+    function rewardsTokenAddress(string calldata prod) external view returns (address) {
+        IStrategy strategy = investStrategy[prod];
+        require(address(strategy) != address(0), "SmartWallet: strategy not configured");
 
-    function rewardsTokenAddress(address token) external view returns (address) {
-        require(tokenStrategy[token] != address(0), "SmartWallet: no token strategy configured");
-
-        IStrategy strategy = IStrategy(tokenStrategy[token]);
         address rewardsToken = strategy.rewardsToken();
         return rewardsToken;
     }
 
     function isNativeToken(address token) internal pure returns (bool) {
         return token == address(0);
-    }
-
-    function balanceOf(address token) external view returns (uint) {
-        IStrategy strategy = IStrategy(tokenStrategy[token]);
-        return strategy.balanceOf(token, address(strategy));
     }
 
     receive() external payable {}

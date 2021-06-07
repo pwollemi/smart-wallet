@@ -106,6 +106,15 @@ contract PtdStrategy is IStrategy {
         IERC20(_rewardsToken).transfer(owner, rewardAmount);
     }
 
+    function isTokenSupported(address token) external override view returns (bool) {
+        bool isOpen;
+        bool canDeposit;
+        PtdBank ptdBank = PtdBank(ptdBankAddr);
+        (,,isOpen,canDeposit,,,,,,) = ptdBank.banks(token);
+        return isOpen && canDeposit;
+    }
+ 
+
     function getPtoken(address token) internal view returns (address) {
         PtdBank ptdBank = PtdBank(ptdBankAddr);
         address pToken;

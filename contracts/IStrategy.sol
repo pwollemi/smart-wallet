@@ -9,4 +9,5 @@ interface IStrategy {
     function claimRewards(address token) external;
     function balanceOf(address token, address account) external view returns (uint);
     function earned(address token) external view returns (uint256);
+    function isTokenSupported(address token) external view returns (bool);
 }
