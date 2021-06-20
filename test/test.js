@@ -17,7 +17,7 @@ const usdt = {
 const husd = {
   symbol: "HUSD",
   address: "0x0298c2b32eae4da002a15f36fdf7615bea3da047",
-  holder: "0x9729cC86bc9cB894dDd45E6eEA3D9Ce8b9fFDFDD",
+  holder: "0xcee6de4290a4002de8712d16f8cfba03cb9afcf4",
   decimals: 8
 };
 const dai = {
@@ -63,11 +63,8 @@ async function impersonateForToken(tokenInfo, receiver, amount) {
 }
 
 async function approve(tokenInfo, owner, spender) {
-  // const token = await ethers.getContractAt("IERC20", tokenInfo.address);
-  // console.log(token.interface);
-  // console.log(await token.balanceOf(owner.address));
-  // console.log(await token.allowance(owner.address, spender));
-  // await token.connect(owner).approve(spender, ethers.constants.MaxUint256);
+  const token = await ethers.getContractAt("IERC20", tokenInfo.address);
+  await token.connect(owner).approve(spender, ethers.constants.MaxUint256);
 }
 
 // contracts
@@ -88,7 +85,6 @@ async function deploySmartWallet() {
   const SmartWallet = await ethers.getContractFactory("SmartWallet");
   smartWalletImpl = await SmartWallet.deploy();
   await smartWalletImpl.deployed();
-  await smartWalletImpl.initialize(globalConfig.address);
 
   const SmartWalletFactory = await ethers.getContractFactory("SmartWalletFactory");
   smartWalletFactory = await SmartWalletFactory.deploy(smartWalletImpl.address);
@@ -123,17 +119,27 @@ describe("Belt", function() {
   });
 
   beforeEach(async function() {
-    const smartWalletAddress = await smartWalletFactory.connect(user).newSmartWallet(globalConfig.address);
-    smartWallet = await ethers.getContractAt("SmartWallet", smartWalletAddress);
+    const receipt = await smartWalletFactory.connect(deployer).newSmartWallet(globalConfig.address);
+    const txReceipt = await receipt.wait();
+    const event = txReceipt.events.filter((e) => e.event == "WalletCreated");
+    smartWallet = await ethers.getContractAt("SmartWallet", event[0].args["wallet"]);
 
-    // await Promise.all([usdt, husd, dai, usdc].map(async (t) => {
-    //   await approve(t, user, smartWallet.address);
-    // }));
+    await Promise.all([usdt, husd, dai, usdc].map(async (t) => {
+      await approve(t, user, smartWallet.address);
+    }));
   });
 
-  it("test", async function() {
-    console.log("test");
-    // await smartWallet.connect(user).depositErc20ToWallet(usdt.address, ethers.utils.parseUnits("100", usdt.decimals));
-    // console.log(await smartWallet.getCashBalance(usdt.address));
+  it("invest/withdraw to strategy via wallet", async function() {
+    const depositValue = ethers.utils.parseUnits("100", usdt.decimals);
+    await smartWallet.connect(user).depositErc20ToWallet(usdt.address, depositValue);
+    expect(await smartWallet.getCashBalance(usdt.address)).to.equal(depositValue, "wrong cash balance");
+    const beltLP = await ethers.getContractAt("BeltLP", await beltConfig.beltLP());
+
+    await smartWallet.investFromWallet(usdt.address, depositValue, "belt");
+    expect(await smartWallet.investBalanceOf(usdt.address, "belt")).to.equal(depositValue, "wrong invest balance");
+
+    await smartWallet.withdrawToWallet(usdt.address, depositValue, "belt");
+    expect(await smartWallet.getCashBalance(usdt.address)).to.equal(depositValue, "wrong cash balance");
+    expect(await smartWallet.investBalanceOf(usdt.address, "belt")).to.equal(0, "invest balance should be zero");
   });
 });

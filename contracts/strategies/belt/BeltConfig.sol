@@ -20,7 +20,10 @@ interface BeltLP {
 
     function calc_token_amount(uint256[4] memory amounts, bool deposit)
         external
-        returns (uint256);
+        view
+        returns (uint256 amount);
+
+    function get_virtual_price() external view returns (uint256);
 }
 
 interface Depositor {
@@ -35,7 +38,7 @@ interface Depositor {
     function calc_withdraw_one_coin(uint256 _token_amount, int128 i)
         external
         view
-        returns (uint256);
+        returns (uint256 amount);
 
     function add_liquidity(uint256[4] memory uamounts, uint256 min_mint_amount)
         external;
@@ -55,7 +58,7 @@ interface MasterOrbit {
     function pendingBELT(uint256 _pid, address _user)
         external
         view
-        returns (uint256);
+        returns (uint256 amount);
 
     function deposit(uint256 _pid, uint256 _wantAmt) external;
 
@@ -64,7 +67,7 @@ interface MasterOrbit {
     function stakedWantTokens(uint256 _pid, address _user)
         external
         view
-        returns (uint256);
+        returns (uint256 amount);
 
     function poolInfo(uint256 _pid)
         external
