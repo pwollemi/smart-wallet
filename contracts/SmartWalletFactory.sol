@@ -19,9 +19,11 @@ contract SmartWalletFactory is Ownable {
     }
 
     function newSmartWallet(address globalConfig) external returns (address) {
-        SmartWallet smartWallet =
-            SmartWallet(payable(Clones.clone(walletImpl)));
+        SmartWallet smartWallet = SmartWallet(
+            payable(Clones.clone(walletImpl))
+        );
         smartWallet.initialize(globalConfig);
+        smartWallet.transferOwnership(msg.sender);
         walletStore[msg.sender] = smartWallet;
 
         emit WalletCreated(msg.sender, address(smartWallet));

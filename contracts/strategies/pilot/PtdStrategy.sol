@@ -56,6 +56,11 @@ contract PtdStrategy is IStrategy {
 
     address public owner;
 
+    modifier onlyOwner() {
+        require(owner == msg.sender, "caller is not the owner");
+        _;
+    }
+
     constructor(PtdConfig _ptdConfig, address _owner) public {
         ptdBankAddr = _ptdConfig.ptdBankAddr();
         _rewardsToken = _ptdConfig.rewardsToken();
@@ -63,7 +68,7 @@ contract PtdStrategy is IStrategy {
         owner = _owner;
     }
 
-    function rewardsToken() external view override returns (address) {
+    function rewardsToken() external view override onlyOwner returns (address) {
         return _rewardsToken;
     }
 
@@ -99,8 +104,9 @@ contract PtdStrategy is IStrategy {
         uint256 totalTokenAmount = PtdBank(ptdBankAddr).totalToken(token);
         address pTokenAddr = getPtoken(token);
         uint256 pTokenTotalSupply = IERC20(pTokenAddr).totalSupply();
-        uint256 tokenBalance =
-            pTokenBalance.mul(totalTokenAmount).div(pTokenTotalSupply);
+        uint256 tokenBalance = pTokenBalance.mul(totalTokenAmount).div(
+            pTokenTotalSupply
+        );
         return tokenBalance;
     }
 
@@ -114,10 +120,9 @@ contract PtdStrategy is IStrategy {
         uint256 totalTokenAmount = PtdBank(ptdBankAddr).totalToken(token);
         address pTokenAddr = getPtoken(token);
         uint256 pTokenTotalSupply = IERC20(pTokenAddr).totalSupply();
-        uint256 pAmount =
-            (totalTokenAmount == 0 || pTokenTotalSupply == 0)
-                ? amount
-                : amount.mul(pTokenTotalSupply).div(totalTokenAmount);
+        uint256 pAmount = (totalTokenAmount == 0 || pTokenTotalSupply == 0)
+            ? amount
+            : amount.mul(pTokenTotalSupply).div(totalTokenAmount);
 
         address stakingPool = getStakingPool(token);
 

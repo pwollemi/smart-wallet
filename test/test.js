@@ -135,7 +135,7 @@ describe("Belt", function() {
     expect(await smartWallet.getCashBalance(usdt.address)).to.equal(depositValue, "wrong cash balance");
     const beltLP = await ethers.getContractAt("BeltLP", await beltConfig.beltLP());
 
-    await smartWallet.investFromWallet(usdt.address, depositValue, "belt");
+    await smartWallet.investFromWallet(usdt.address, depositValue, "belt", { value: ethers.constants.Zero });
     expect(await smartWallet.investBalanceOf(usdt.address, "belt")).to.equal(depositValue, "wrong invest balance");
 
     await smartWallet.withdrawToWallet(usdt.address, depositValue, "belt");

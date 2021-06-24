@@ -64,7 +64,7 @@ contract SmartWallet is OwnableUpgradeable {
         address token,
         uint256 amount,
         string calldata prod
-    ) external payable {
+    ) external payable onlyOwner {
         require(amount != 0, "SmartWallet: zero invest amount");
 
         IStrategy currentStrategy = getInvestStrategy(prod);
@@ -110,8 +110,9 @@ contract SmartWallet is OwnableUpgradeable {
                 "SmartWallet: no strategy configured"
             );
 
-            IStrategyFactory strategyFactory =
-                IStrategyFactory(globalConfig.getStrategyFactory(prod));
+            IStrategyFactory strategyFactory = IStrategyFactory(
+                globalConfig.getStrategyFactory(prod)
+            );
             IStrategy newStrategy = strategyFactory.newStrategy();
             investStrategy[prod] = newStrategy;
         }
@@ -148,7 +149,6 @@ contract SmartWallet is OwnableUpgradeable {
             address(strategy) != address(0),
             "SmartWallet: strategy not configured"
         );
-
         strategy.withdraw(token, amount);
     }
 

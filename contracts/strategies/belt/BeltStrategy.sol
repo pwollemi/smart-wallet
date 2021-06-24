@@ -20,9 +20,14 @@ contract BeltStrategy is IStrategy {
     BeltLP public beltLP;
     uint256 private poolId;
     address private lpToken;
-    address public _rewardsToken;
+    address private _rewardsToken;
 
     address public owner;
+
+    modifier onlyOwner() {
+        require(owner == msg.sender, "caller is not the owner");
+        _;
+    }
 
     constructor(BeltConfig _beltConfig, address _owner) public {
         beltConfig = _beltConfig;
@@ -37,28 +42,40 @@ contract BeltStrategy is IStrategy {
         owner = _owner;
     }
 
-    function rewardsToken() external view override returns (address) {
+    function rewardsToken() external view override onlyOwner returns (address) {
         return _rewardsToken;
     }
 
-    function deposit(address token, uint256 amount) external payable override {
+    event TestEvent(uint256[N_COINS] uamounts, uint256 min_mint_amount);
+
+    function deposit(address token, uint256 amount)
+        external
+        payable
+        override
+        onlyOwner
+    {
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+
         uint256 lpTokenAmount;
         if (token == lpToken) {
-            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
             lpTokenAmount = amount;
         } else {
             BeltConfig.Coin memory coin = getTokenInfo(token);
 
             uint256[N_COINS] memory uamounts;
             uamounts[coin.index] = amount;
-            uint256 min_mint_amount =
-                beltLP.calc_token_amount(uamounts, true).mul(99).div(100);
+            // max slippage is 1%
+            uint256 min_mint_amount = beltLP
+            .calc_token_amount(uamounts, true)
+            .mul(99)
+            .div(100);
 
+            IERC20(token).approve(address(depositor), amount);
             depositor.add_liquidity(uamounts, min_mint_amount);
             lpTokenAmount = IERC20(lpToken).balanceOf(address(this));
         }
 
-        IERC20(token).approve(address(masterOrbit), lpTokenAmount);
+        IERC20(lpToken).approve(address(masterOrbit), lpTokenAmount);
         masterOrbit.deposit(poolId, lpTokenAmount);
     }
 
@@ -66,6 +83,7 @@ contract BeltStrategy is IStrategy {
         external
         view
         override
+        onlyOwner
         returns (uint256)
     {
         uint256 lpTokenAmount = masterOrbit.stakedWantTokens(poolId, account);
@@ -81,42 +99,58 @@ contract BeltStrategy is IStrategy {
         }
     }
 
-    function earned(address token) external view override returns (uint256) {
-        require(isTokenSupported(token));
+    function earned(address token)
+        external
+        view
+        override
+        onlyOwner
+        returns (uint256)
+    {
+        require(_isTokenSupported(token));
         uint256 rewardAmount = IERC20(_rewardsToken).balanceOf(address(this));
         return masterOrbit.pendingBELT(poolId, address(this)).add(rewardAmount);
     }
 
-    function withdraw(address token, uint256 amount) external override {
-        uint256 lpTokenAmount;
+    function withdraw(address token, uint256 amount)
+        external
+        override
+        onlyOwner
+    {
         if (token == lpToken) {
-            lpTokenAmount = amount;
-            masterOrbit.withdraw(poolId, lpTokenAmount);
-            IERC20(token).transfer(owner, amount);
+            masterOrbit.withdraw(poolId, amount);
+            IERC20(token).safeTransfer(owner, amount);
         } else {
             BeltConfig.Coin memory coin = getTokenInfo(token);
 
             uint256[N_COINS] memory uamounts;
             uamounts[coin.index] = amount;
-            lpTokenAmount = beltLP.calc_token_amount(uamounts, false);
+            uint256 lpTokenAmount = beltLP.calc_token_amount(uamounts, false);
+            uint256 max_burn_amount = lpTokenAmount.mul(100).div(99);
 
             masterOrbit.withdraw(poolId, lpTokenAmount);
-
-            uint256 max_burn_amount = lpTokenAmount.mul(100).div(99);
+            IERC20(lpToken).approve(address(depositor), lpTokenAmount);
             depositor.remove_liquidity_imbalance(uamounts, max_burn_amount);
-            uint256 tokenAmount = IERC20(token).balanceOf(address(this));
-            IERC20(token).transfer(owner, tokenAmount);
-        }
 
-        uint256 rewardAmount = IERC20(_rewardsToken).balanceOf(address(this));
-        IERC20(_rewardsToken).transfer(owner, rewardAmount);
+            uint256 realAmount = IERC20(token).balanceOf(address(this));
+            IERC20(token).safeTransfer(owner, realAmount);
+        }
     }
 
-    function claimRewards(address token) external override {
-        require(isTokenSupported(token));
+    function claimRewards(address token) external override onlyOwner {
+        require(_isTokenSupported(token));
         masterOrbit.withdraw(poolId, 0);
         uint256 rewardAmount = IERC20(_rewardsToken).balanceOf(address(this));
-        IERC20(_rewardsToken).transfer(owner, rewardAmount);
+        IERC20(_rewardsToken).safeTransfer(owner, rewardAmount);
+    }
+
+    function isTokenSupported(address token)
+        external
+        view
+        override
+        onlyOwner
+        returns (bool)
+    {
+        return _isTokenSupported(token);
     }
 
     function getTokenInfo(address token)
@@ -130,12 +164,7 @@ contract BeltStrategy is IStrategy {
         return BeltConfig.Coin(index, coin);
     }
 
-    function isTokenSupported(address token)
-        public
-        view
-        override
-        returns (bool)
-    {
+    function _isTokenSupported(address token) internal view returns (bool) {
         (, address coin) = beltConfig.coins(token);
         return token == lpToken || coin != address(0);
     }
