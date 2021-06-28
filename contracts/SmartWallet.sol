@@ -196,6 +196,25 @@ contract SmartWallet is OwnableUpgradeable {
     }
 
     /**
+     * @notice Get rewards number for specific token
+     * @param token The token to generate rewards
+     * @param prod The production to generate rewards
+     */
+    function earned(address token, string calldata prod)
+        external
+        view
+        returns (uint256)
+    {
+        IStrategy strategy = investStrategy[prod];
+        require(
+            address(strategy) != address(0),
+            "SmartWallet: strategy not configured"
+        );
+
+        return strategy.earned(token);
+    }
+
+    /**
      * @notice Claim rewards from specific production
      * @param token The token to generate rewards
      * @param prod The production to generate rewards
