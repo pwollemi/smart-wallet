@@ -46,8 +46,6 @@ contract BeltStrategy is IStrategy {
         return _rewardsToken;
     }
 
-    event TestEvent(uint256[N_COINS] uamounts, uint256 min_mint_amount);
-
     function deposit(address token, uint256 amount)
         external
         payable
@@ -64,6 +62,7 @@ contract BeltStrategy is IStrategy {
 
             uint256[N_COINS] memory uamounts;
             uamounts[coin.index] = amount;
+
             // max slippage is 1%
             uint256 min_mint_amount = beltLP
             .calc_token_amount(uamounts, true)
