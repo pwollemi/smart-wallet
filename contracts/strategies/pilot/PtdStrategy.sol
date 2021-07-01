@@ -68,11 +68,16 @@ contract PtdStrategy is IStrategy {
         owner = _owner;
     }
 
-    function rewardsToken() external view override onlyOwner returns (address) {
+    function rewardsToken() external view override returns (address) {
         return _rewardsToken;
     }
 
-    function deposit(address token, uint256 amount) external payable override {
+    function deposit(address token, uint256 amount)
+        external
+        payable
+        override
+        onlyOwner
+    {
         PtdBank ptdBank = PtdBank(ptdBankAddr);
         address stakingPool = getStakingPool(token);
 
@@ -116,7 +121,11 @@ contract PtdStrategy is IStrategy {
         return StakingReward(stakingPool).earned(address(this));
     }
 
-    function withdraw(address token, uint256 amount) external override {
+    function withdraw(address token, uint256 amount)
+        external
+        override
+        onlyOwner
+    {
         uint256 totalTokenAmount = PtdBank(ptdBankAddr).totalToken(token);
         address pTokenAddr = getPtoken(token);
         uint256 pTokenTotalSupply = IERC20(pTokenAddr).totalSupply();
@@ -136,7 +145,7 @@ contract PtdStrategy is IStrategy {
         }
     }
 
-    function claimRewards(address token) external override {
+    function claimRewards(address token) external override onlyOwner {
         address stakingPool = getStakingPool(token);
 
         StakingReward(stakingPool).getReward();

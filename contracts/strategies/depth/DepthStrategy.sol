@@ -30,11 +30,16 @@ contract DepthStrategy is IStrategy {
         owner = _owner;
     }
 
-    function rewardsToken() external view override onlyOwner returns (address) {
+    function rewardsToken() external view override returns (address) {
         return _rewardsToken;
     }
 
-    function deposit(address token, uint256 amount) external payable override {
+    function deposit(address token, uint256 amount)
+        external
+        payable
+        override
+        onlyOwner
+    {
         (address vault, uint256 pid) = getVaultInfo(token);
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
@@ -70,7 +75,11 @@ contract DepthStrategy is IStrategy {
         return IPiggyBreeder(piggyBreeder).pendingPiggy(pid, address(this));
     }
 
-    function withdraw(address token, uint256 amount) external override {
+    function withdraw(address token, uint256 amount)
+        external
+        override
+        onlyOwner
+    {
         (address vault, uint256 pid) = getVaultInfo(token);
 
         IPiggyBreeder(piggyBreeder).unStake(pid, amount);
@@ -78,7 +87,7 @@ contract DepthStrategy is IStrategy {
         IERC20(token).transfer(owner, amount);
     }
 
-    function claimRewards(address token) external override {
+    function claimRewards(address token) external override onlyOwner {
         (address vault, uint256 pid) = getVaultInfo(token);
 
         IPiggyBreeder(piggyBreeder).claim(pid);

@@ -25,7 +25,7 @@ contract BeltStrategy is IStrategy {
     address public owner;
 
     modifier onlyOwner() {
-        require(owner == msg.sender, "caller is not the owner");
+        require(owner == msg.sender, "unsupported token");
         _;
     }
 
@@ -42,7 +42,7 @@ contract BeltStrategy is IStrategy {
         owner = _owner;
     }
 
-    function rewardsToken() external view override onlyOwner returns (address) {
+    function rewardsToken() external view override returns (address) {
         return _rewardsToken;
     }
 
@@ -52,6 +52,8 @@ contract BeltStrategy is IStrategy {
         override
         onlyOwner
     {
+        require(msg.value == 0, "HT is not supported");
+
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
         uint256 lpTokenAmount;
@@ -82,7 +84,6 @@ contract BeltStrategy is IStrategy {
         external
         view
         override
-        onlyOwner
         returns (uint256)
     {
         uint256 lpTokenAmount = masterOrbit.stakedWantTokens(poolId, account);
@@ -98,14 +99,8 @@ contract BeltStrategy is IStrategy {
         }
     }
 
-    function earned(address token)
-        external
-        view
-        override
-        onlyOwner
-        returns (uint256)
-    {
-        require(_isTokenSupported(token));
+    function earned(address token) external view override returns (uint256) {
+        require(_isTokenSupported(token), "unsupported token");
         uint256 rewardAmount = IERC20(_rewardsToken).balanceOf(address(this));
         return masterOrbit.pendingBELT(poolId, address(this)).add(rewardAmount);
     }
@@ -136,7 +131,7 @@ contract BeltStrategy is IStrategy {
     }
 
     function claimRewards(address token) external override onlyOwner {
-        require(_isTokenSupported(token));
+        require(_isTokenSupported(token), "token is not supported");
         masterOrbit.withdraw(poolId, 0);
         uint256 rewardAmount = IERC20(_rewardsToken).balanceOf(address(this));
         IERC20(_rewardsToken).safeTransfer(owner, rewardAmount);
@@ -146,7 +141,6 @@ contract BeltStrategy is IStrategy {
         external
         view
         override
-        onlyOwner
         returns (bool)
     {
         return _isTokenSupported(token);
@@ -167,6 +161,4 @@ contract BeltStrategy is IStrategy {
         (, address coin) = beltConfig.coins(token);
         return token == lpToken || coin != address(0);
     }
-
-    receive() external payable {}
 }
