@@ -79,6 +79,31 @@ async function depth(globalConfig) {
     }
 }
 
+
+async function deployBooster(source) {
+    const BOOSTER_FILDA = "booster-filda";
+    const BOOSTER_CAN = "booster-can";
+    const booBankAddr = "0xa61a4f9275ef62d2c076b0933f8a9418cec8c670";
+    const booPoolsAddr = "0xBa92b862ac310D42A8a3DE613dcE917d0d63D98c"; 
+
+    const BooConfig = await ethers.getContractFactory("BooConfig");
+    const booConfig = await BooConfig.deploy(booBankAddr, booPoolsAddr, source);
+    await booConfig.deployed();
+    console.log("BooConfig address:" , booConfig.address);
+  
+    const BooStrategyFactory = await ethers.getContractFactory("BooStrategyFactory");
+    const booStrategyFactory = await BooStrategyFactory.deploy(booConfig.address);
+    await booStrategyFactory.deployed();
+    console.log("StrategyFactory:", booStrategyFactory.address);
+  
+    await globalConfig.setStrategyFactory(source == "filda" ? BOOSTER_FILDA : BOOSTER_CAN, booStrategyFactory.address);
+}
+
+async function booster() {
+    await deployBooster("filda");
+    await deployBooster("channels");
+}
+
 async function smartwallet() {
     const GlobalConfig = await ethers.getContractFactory("GlobalConfig");
     const globalConfig = await GlobalConfig.deploy();

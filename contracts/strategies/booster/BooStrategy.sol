@@ -2,130 +2,140 @@
 
 pragma solidity ^0.6.9;
 
-// import "../../interfaces/IStrategy.sol";
-// import "./BooConfig.sol";
-// import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-// import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-// import "@openzeppelin/contracts/math/SafeMath.sol";
+import "../../interfaces/IStrategy.sol";
+import "./BooConfig.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 
-// contract BooStrategy is IStrategy {
-//     using SafeERC20 for IERC20;
-//     using SafeMath for uint256;
+import "hardhat/console.sol";
 
-//     address public actionPoolsAddr;
-//     address private _rewardsToken;
-//     BooConfig public booConfig;
+contract BooStrategy is IStrategy {
+    using SafeERC20 for IERC20;
+    using SafeMath for uint256;
 
-//     address public owner;
+    address public booPools;
+    address private _rewardsToken;
+    address private _rewardsToken2;
+    BooConfig public booConfig;
 
-//     constructor(BooConfig _booConfig, address _owner) public {
-//         actionPoolsAddr = _booConfig.actionPools();
-//         _rewardsToken = _booConfig.rewardsToken();
-//         booConfig = _booConfig;
-//         owner = _owner;
-//     }
+    address public owner;
 
-//     function rewardsToken() external view override returns (address) {
-//         return _rewardsToken;
-//     }
+    modifier onlyOwner() {
+        require(owner == msg.sender, "caller is not the owner");
+        _;
+    }
 
-//     function deposit(address token, uint256 amount) external payable override {
-//         PtdBank ptdBank = PtdBank(ptdBankAddr);
-//         address stakingPool = getStakingPool(token);
+    constructor(BooConfig _booConfig, address _owner) public {
+        booPools = _booConfig.booPools();
+        _rewardsToken = _booConfig.rewardsToken();
+        _rewardsToken2 = _booConfig.rewardsToken2();
+        booConfig = _booConfig;
+        owner = _owner;
+    }
 
-//         if (token == address(0)) {
-//             //HT
-//             amount = msg.value;
-//         } else {
-//             IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-//             IERC20(token).approve(ptdBankAddr, amount);
-//         }
-//         ptdBank.deposit{value: msg.value}(token, amount);
+    function rewardsToken() external view override returns (address) {
+        return _rewardsToken;
+    }
 
-//         address pToken = getPtoken(token);
-//         uint256 pTokenAmount = IERC20(pToken).balanceOf(address(this));
+    function deposit(address token, uint256 amount)
+        external
+        payable
+        override
+        onlyOwner
+    {
+        (address safeBox, uint256 booPid, , ) = getPoolInfo(token);
 
-//         IERC20(pToken).approve(stakingPool, pTokenAmount);
-//         StakingReward(stakingPool).stake(pTokenAmount);
-//     }
+        console.log(safeBox);
+        console.log(booPid);
 
-//     function balanceOf(address token, address account)
-//         external
-//         view
-//         override
-//         returns (uint256)
-//     {
-//         address stakingPool = getStakingPool(token);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(token).approve(safeBox, amount);
 
-//         uint256 pTokenBalance = StakingReward(stakingPool).balanceOf(account);
-//         uint256 totalTokenAmount = PtdBank(ptdBankAddr).totalToken(token);
-//         address pTokenAddr = getPtoken(token);
-//         uint256 pTokenTotalSupply = IERC20(pTokenAddr).totalSupply();
-//         uint256 tokenBalance =
-//             pTokenBalance.mul(totalTokenAmount).div(pTokenTotalSupply);
-//         return tokenBalance;
-//     }
+        ISafeBox(safeBox).deposit(amount);
 
-//     function earned(address token) external view override returns (uint256) {
-//         address stakingPool = getStakingPool(token);
+        uint256 bTokenAmount = IERC20(safeBox).balanceOf(address(this));
+        console.log(bTokenAmount);
 
-//         return StakingReward(stakingPool).earned(address(this));
-//     }
+        IERC20(safeBox).approve(booPools, bTokenAmount);
+        IBooPools(booPools).deposit(booPid, bTokenAmount);
+    }
 
-//     function withdraw(address token, uint256 amount) external override {
-//         uint256 totalTokenAmount = PtdBank(ptdBankAddr).totalToken(token);
-//         address pTokenAddr = getPtoken(token);
-//         uint256 pTokenTotalSupply = IERC20(pTokenAddr).totalSupply();
-//         uint256 pAmount =
-//             (totalTokenAmount == 0 || pTokenTotalSupply == 0)
-//                 ? amount
-//                 : amount.mul(pTokenTotalSupply).div(totalTokenAmount);
+    function balanceOf(address token, address account)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        (address safeBox, uint256 booPid, , ) = getPoolInfo(token);
+        (uint256 bTokenBalance, , ) = IBooPools(booPools).userInfo(
+            booPid,
+            account
+        );
+        uint256 exchangeRate = ISafeBox(safeBox).getBaseTokenPerLPToken();
+        uint256 tokenBalance = bTokenBalance.mul(exchangeRate).div(1e18);
+        return tokenBalance;
+    }
 
-//         address stakingPool = getStakingPool(token);
+    function earned(address token) external view override returns (uint256) {
+        (, uint256 booPid, address actionPool, uint256 actionPid) = getPoolInfo(
+            token
+        );
+        // BOO reward
+        return IBooPools(booPools).pendingRewards(booPid, address(this));
 
-//         StakingReward(stakingPool).withdraw(pAmount);
-//         PtdBank(ptdBankAddr).withdraw(token, pAmount);
-//         if (token == address(0)) {
-//             //HT
-//             payable(owner).transfer(amount);
-//         } else {
-//             IERC20(token).transfer(owner, amount);
-//         }
-//     }
+        // Filda/Can rewards
+        // return IActionPools(actionPool).pendingRewards(actionPid, address(this));
+    }
 
-//     function claimRewards(address token) external override {
-//         address stakingPool = getStakingPool(token);
+    function withdraw(address token, uint256 amount)
+        external
+        override
+        onlyOwner
+    {
+        (address safeBox, uint256 booPid, , ) = getPoolInfo(token);
+        uint256 exchangeRate = ISafeBox(safeBox).getBaseTokenPerLPToken();
+        uint256 btokenAmount = amount.mul(1e18).div(exchangeRate);
+        IBooPools(booPools).withdraw(booPid, btokenAmount);
+        ISafeBox(safeBox).withdraw(amount);
+        IERC20(token).transfer(owner, amount);
+    }
 
-//         StakingReward(stakingPool).getReward();
-//         uint256 rewardAmount = IERC20(_rewardsToken).balanceOf(address(this));
-//         IERC20(_rewardsToken).transfer(owner, rewardAmount);
-//     }
+    function claimRewards(address token) external override onlyOwner {
+        (, uint256 booPid, address actionPool, uint256 actionPid) = getPoolInfo(
+            token
+        );
 
-//     function isTokenSupported(address token)
-//         external
-//         view
-//         override
-//         returns (bool)
-//     {
-//         bool isOpen;
-//         bool canDeposit;
-//         PtdBank ptdBank = PtdBank(ptdBankAddr);
-//         (, , isOpen, canDeposit, , , , , , ) = ptdBank.banks(token);
-//         return isOpen && canDeposit;
-//     }
+        IBooPools(booPools).claim(booPid);
+        uint256 rewardAmount = IERC20(_rewardsToken).balanceOf(address(this));
+        IERC20(_rewardsToken).transfer(owner, rewardAmount);
 
-//     function getPtoken(address token) internal view returns (address) {
-//         // PtdBank ptdBank = PtdBank(ptdBankAddr);
-//         // address pToken;
-//         // (, pToken, , , , , , , , ) = ptdBank.banks(token);
-//         // return pToken;
-//     }
+        IActionPools(actionPool).claim(actionPid);
+        uint256 rewardAmount2 = IERC20(_rewardsToken2).balanceOf(address(this));
+        IERC20(_rewardsToken2).transfer(owner, rewardAmount2);
+    }
 
-//     function getStakingPool(address token) internal view returns (address) {
-//         // address stakingPool = booConfig.getStakingPool(token);
-//         // require(stakingPool != address(0), "staking pool is not configured");
-//         // return stakingPool;
-//     }
+    function isTokenSupported(address token)
+        external
+        view
+        override
+        returns (bool)
+    {
+        (address safeBox, , , ) = booConfig.getPoolInfo(token);
+        return safeBox != address(0);
+    }
 
-//     receive() external payable {}
-// }
+    function getPoolInfo(address token)
+        internal
+        view
+        returns (
+            address safeBox,
+            uint256 booPid,
+            address actionPool,
+            uint256 actionPid
+        )
+    {
+        (safeBox, booPid, actionPool, actionPid) = booConfig.getPoolInfo(token);
+        require(safeBox != address(0), "vault info is not configured");
+    }
+}

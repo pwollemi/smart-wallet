@@ -21,37 +21,15 @@ const husd = {
   decimals: 8
 };
 
-// depth
-const DEP = "0x48c859531254f25e57d1c1a8e030ef0b1c895c27";
+const FILDA = "0xE36FFD17B2661EB57144cEaEf942D95295E637F0";
+const CAN = "0x1e6395E6B059fc97a4ddA925b6c5ebf19E05c69f";
+const BOO = "0xff96dccf2763d512b6038dc60b7e96d1a9142507";
 
-const vaults = [{
-        name: "CoinWind",
-        "usdt": "0xd96e3FeDbF4640063F2B20Bd7B646fFbe3c774FF",
-        "husd": "0x7e1Ac905214214c1E339aaFBA72E2Ce29a7bEC22"
-    }, {
-        name: "Back",
-        "usdt": "0x22BAd7190D3585F6be4B9fCed192E9343ec9d5c7",
-        "husd": "0x996a0e31508E93EB53fd27d216E111fB08E22255"
-    }, {
-        name: "Pilot",
-        "usdt": "0xB567bd78A4Ef08EE9C08762716B1699C46bA5ea3",
-        "husd": "0x9bd25Ed64F55f317d0404CCD063631CbfC4fc90b"
-    }, {
-        name: "Filda",
-        "usdt": "0x6FF92A0e4dA9432a79748A15c5B8eCeE6CF0eE66",
-        "husd": "0xE308880c215246Fa78753DE7756F9fc814D1C186"
-    }, {
-        name: "Channels",
-        "usdt": "0x95c258E41f5d204426C33628928b7Cc10FfcF866",
-        "husd": "0x9213c6269Faed1dE6102A198d05a6f9E9D70e1D0"
-    }, {
-        name: "Lendhub",
-        "usdt": "0x70941A63D4E24684Bd746432123Da1fE0bFA1A35",
-        "husd": "0x80Da2161a80f50fea78BE73044E39fE5361aC0dC"
-    }
-];
+const booBankAddr = "0xa61a4f9275ef62d2c076b0933f8a9418cec8c670";
+const booPoolsAddr = "0xBa92b862ac310D42A8a3DE613dcE917d0d63D98c";
 
-const piggyBreederAddr = "0x59F8AD2495236B25BA95E3161154F0024fbDBDCe";
+const BOOSTER_FILDA = "booster-filda";
+const BOOSTER_CAN = "booster-can";
 
 async function impersonateForToken(tokenInfo, receiver, amount) {
   console.log("Impersonating for " + tokenInfo.symbol);
@@ -87,10 +65,11 @@ let smartWalletImpl;
 let smartWallet;
 let smartWalletFactory;
 let usdtContract;
+let fildaContract;
+let canContract;
 
-let startegyNames = [];
-let depthStrategyFactories = [];
-let lpTokenToPid = {};
+let booFildaStrategyFactory;
+let booChannelsStrategyFactory;
 
 async function deploySmartWallet() {
   console.log("Deploying SmartWallet Contracts");
@@ -108,39 +87,28 @@ async function deploySmartWallet() {
   await smartWalletFactory.deployed();
 }
 
-async function getDepthInitData() {
-  const piggyBreeder = await ethers.getContractAt("IPiggyBreeder", piggyBreederAddr);
-  const poolLength = await piggyBreeder.poolLength();
-  for (let i = 0; i < poolLength; i++) {
-    const pool = await piggyBreeder.poolInfo(i);
-    lpTokenToPid[pool["lpToken"]] = i;
+async function deployBooster(source) {
+  console.log("Deploying Booster Contracts");
+
+  const BooConfig = await ethers.getContractFactory("BooConfig");
+  const booConfig = await BooConfig.deploy(booBankAddr, booPoolsAddr, source);
+  await booConfig.deployed();
+  console.log("BooConfig address:" , booConfig.address);
+
+  const BooStrategyFactory = await ethers.getContractFactory("BooStrategyFactory");
+  const booStrategyFactory = await BooStrategyFactory.deploy(booConfig.address);
+  await booStrategyFactory.deployed();
+  console.log("StrategyFactory:", booStrategyFactory.address);
+
+  if (source == "filda") {
+    booFildaStrategyFactory = booStrategyFactory;
+  } else {
+    booChannelsStrategyFactory = booStrategyFactory;
   }
+  await globalConfig.setStrategyFactory(source == "filda" ? BOOSTER_FILDA : BOOSTER_CAN, booStrategyFactory.address);
 }
 
-async function deployDepth() {
-  for (let i = 0; i < vaults.length; i++) {
-      const startegyName = "Depth-" + vaults[i].name;
-
-      const DepthConfig = await ethers.getContractFactory("DepthConfig");
-      const depthConfig = await DepthConfig.deploy(piggyBreederAddr, DEP);
-      await depthConfig.deployed();
-      console.log(startegyName, "DepthConfig address:", depthConfig.address);
-
-      await depthConfig.setVault(usdt.address, vaults[i]["usdt"], lpTokenToPid[vaults[i]["usdt"]]);
-      await depthConfig.setVault(husd.address, vaults[i]["husd"], lpTokenToPid[vaults[i]["husd"]]);
-
-      const DepthStrategyFactory = await ethers.getContractFactory("DepthStrategyFactory");
-      const depthStrategyFactory = await DepthStrategyFactory.deploy(depthConfig.address);
-      await depthStrategyFactory.deployed();
-      console.log(startegyName, "StrategyFactory:", depthStrategyFactory.address);
-
-      await globalConfig.setStrategyFactory(startegyName, depthStrategyFactory.address);
-      startegyNames.push(startegyName);
-      depthStrategyFactories.push(depthStrategyFactory);
-  }
-}
-
-describe("Depth", function() {
+describe("Booster filda", function() {
   let deployer, user;
   let productName;
 
@@ -149,15 +117,14 @@ describe("Depth", function() {
 
     usdtContract = await ethers.getContractAt("IERC20", usdt.address);
 
-    await getDepthInitData();
     await deploySmartWallet();
-    await deployDepth();
+    await deployBooster("filda");
 
     await Promise.all([usdt, husd].map(async (t) => {
       await impersonateForToken(t, user, "10000");
     }));
 
-    productName = startegyNames[3];
+    productName = BOOSTER_FILDA;
   });
 
   beforeEach(async function() {
@@ -181,16 +148,16 @@ describe("Depth", function() {
     // check getCashBalance
     expect(await smartWallet.getCashBalance(usdt.address)).to.equal(depositValue);
 
-    // invest to depth from smart wallet
+    // invest to boo from smart wallet
     await smartWallet.connect(user).investFromWallet(usdt.address, depositValue, productName, { value: ethers.constants.Zero, gasLimit: "10000000" });
     console.log("Invested from wallet: ", depositValue.toString());
 
     // check invested balance
     const investBalance = await smartWallet.investBalanceOf(usdt.address, productName);
     console.log("Invest Balance Of: ", investBalance.toString());
-    expect(depositValue).to.equal(investBalance);
+    // expect(depositValue).to.equal(investBalance);
 
-    // withdraw from depth to smart wallet
+    // withdraw from boo to smart wallet
     await smartWallet.connect(user).withdrawToWallet(usdt.address, investBalance, productName, { gasLimit: "10000000" });
     const cashBalance = await smartWallet.getCashBalance(usdt.address);
     console.log("Actual withdrawn balance: ", cashBalance.toString());
@@ -198,9 +165,9 @@ describe("Depth", function() {
     // check withdrawn balance after slippage
     expect(investBalance.mul(99).div(100).toString()).to.be.bignumber.lessThan(cashBalance.toString());
 
-    // check remaining balance at depth
+    // check remaining balance at boo
     const remainingBalance = await smartWallet.investBalanceOf(usdt.address, productName);
-    console.log("Remaining balance at Depth: ", remainingBalance.toString());
+    console.log("Remaining balance at Boo: ", remainingBalance.toString());
     // expect(remainingBalance).to.equal(0);
 
     // withdraw from smart wallet
@@ -226,7 +193,7 @@ describe("Depth", function() {
   it("direct invest/withdraw to strategy", async function() {
     const depositValue = ethers.utils.parseUnits("0.00000000000001", usdt.decimals);
 
-    // invest to depth directly
+    // invest to boo directly
     await smartWallet.connect(user).directInvest(usdt.address, depositValue, productName, { value: ethers.constants.Zero, gasLimit: "10000000" });
     console.log("Directly invested: ", depositValue.toString());
 
@@ -235,16 +202,16 @@ describe("Depth", function() {
     console.log("Invest Balance: ", investBalance.toString());
     expect(depositValue.mul(99).div(100).toString()).to.be.bignumber.lessThan(investBalance.toString());
 
-    // withdraw from depth to smart wallet
+    // withdraw from boo to smart wallet
     const beforeWithdraw = await usdtContract.balanceOf(user.address);
     // the return value would be less than investBalance
     await smartWallet.connect(user).directWithdraw(usdt.address, investBalance, productName, { gasLimit: "10000000" });
     const afterWithdraw = await usdtContract.balanceOf(user.address);
     console.log("Actual withdrawn value: ", afterWithdraw - beforeWithdraw);
 
-    // check remaining balance at depth
+    // check remaining balance at boo
     const remainingBalance = await smartWallet.investBalanceOf(usdt.address, productName);
-    console.log("Remaining balance at Depth: ", remainingBalance.toString());
+    console.log("Remaining balance at Boo: ", remainingBalance.toString());
     expect(remainingBalance).to.equal(0);
   });
 });

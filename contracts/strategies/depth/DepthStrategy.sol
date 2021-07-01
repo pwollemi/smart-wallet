@@ -61,11 +61,11 @@ contract DepthStrategy is IStrategy {
     {
         (address vault, uint256 pid) = getVaultInfo(token);
 
+        // Vault mints the same amount of token
         (uint256 lpTokenAmount, , , ) = IPiggyBreeder(piggyBreeder).userInfo(
             pid,
             account
         );
-        // Vault mints the same amount of token
         return lpTokenAmount;
     }
 
@@ -110,11 +110,7 @@ contract DepthStrategy is IStrategy {
         view
         returns (address vault, uint256 pid)
     {
-        (address vault_, uint256 pid_) = depthConfig.getVaultInfo(token);
-        require(vault_ != address(0), "vault info is not configured");
-
-        return (vault_, pid_);
+        (vault, pid) = depthConfig.getVaultInfo(token);
+        require(vault != address(0), "vault info is not configured");
     }
-
-    receive() external payable {}
 }
