@@ -97,8 +97,10 @@ contract BooStrategy is IStrategy {
         uint256 exchangeRate = ISafeBox(safeBox).getBaseTokenPerLPToken();
         uint256 btokenAmount = amount.mul(1e18).div(exchangeRate);
         IBooPools(booPools).withdraw(booPid, btokenAmount);
-        ISafeBox(safeBox).withdraw(amount);
-        IERC20(token).transfer(owner, amount);
+        ISafeBox(safeBox).withdraw(btokenAmount);
+
+        uint256 realAmount = IERC20(token).balanceOf(address(this));
+        IERC20(token).transfer(owner, realAmount);
     }
 
     function claimRewards(address token) external override onlyOwner {

@@ -135,7 +135,7 @@ contract BooConfig {
         _initBooPools();
     }
 
-    function rewardsToken() external view returns (address) {
+    function rewardsToken() external pure returns (address) {
         return BOO_TOKEN;
     }
 
@@ -224,7 +224,7 @@ contract BooConfig {
 
     function _compareStrings(string memory a, string memory b)
         internal
-        view
+        pure
         returns (bool)
     {
         return (keccak256(abi.encodePacked((a))) ==
