@@ -109,6 +109,7 @@ contract BeltStrategy is IStrategy {
         external
         override
         onlyOwner
+        returns (uint256)
     {
         if (token == lpToken) {
             masterOrbit.withdraw(poolId, amount);
@@ -127,6 +128,7 @@ contract BeltStrategy is IStrategy {
 
             uint256 realAmount = IERC20(token).balanceOf(address(this));
             IERC20(token).safeTransfer(owner, realAmount);
+            return realAmount;
         }
     }
 

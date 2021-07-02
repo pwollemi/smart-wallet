@@ -125,6 +125,7 @@ contract PtdStrategy is IStrategy {
         external
         override
         onlyOwner
+        returns (uint256)
     {
         uint256 totalTokenAmount = PtdBank(ptdBankAddr).totalToken(token);
         address pTokenAddr = getPtoken(token);
@@ -143,6 +144,7 @@ contract PtdStrategy is IStrategy {
         } else {
             IERC20(token).transfer(owner, amount);
         }
+        return amount;
     }
 
     function claimRewards(address token) external override onlyOwner {

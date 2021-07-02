@@ -8,8 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
-import "hardhat/console.sol";
-
 contract BooStrategy is IStrategy {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
@@ -46,16 +44,12 @@ contract BooStrategy is IStrategy {
     {
         (address safeBox, uint256 booPid, , ) = getPoolInfo(token);
 
-        console.log(safeBox);
-        console.log(booPid);
-
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(token).approve(safeBox, amount);
 
         ISafeBox(safeBox).deposit(amount);
 
         uint256 bTokenAmount = IERC20(safeBox).balanceOf(address(this));
-        console.log(bTokenAmount);
 
         IERC20(safeBox).approve(booPools, bTokenAmount);
         IBooPools(booPools).deposit(booPid, bTokenAmount);
@@ -92,6 +86,7 @@ contract BooStrategy is IStrategy {
         external
         override
         onlyOwner
+        returns (uint256)
     {
         (address safeBox, uint256 booPid, , ) = getPoolInfo(token);
         uint256 exchangeRate = ISafeBox(safeBox).getBaseTokenPerLPToken();
@@ -101,6 +96,7 @@ contract BooStrategy is IStrategy {
 
         uint256 realAmount = IERC20(token).balanceOf(address(this));
         IERC20(token).transfer(owner, realAmount);
+        return realAmount;
     }
 
     function claimRewards(address token) external override onlyOwner {

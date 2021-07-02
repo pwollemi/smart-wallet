@@ -169,12 +169,12 @@ contract SmartWallet is OwnableUpgradeable {
             "SmartWallet: strategy not configured"
         );
 
-        strategy.withdraw(token, amount);
+        uint256 actualAmount = strategy.withdraw(token, amount);
         if (token == address(0)) {
             // native token
-            payable(owner()).transfer(amount);
+            payable(owner()).transfer(actualAmount);
         } else {
-            IERC20(token).transfer(owner(), amount);
+            IERC20(token).transfer(owner(), actualAmount);
         }
     }
 

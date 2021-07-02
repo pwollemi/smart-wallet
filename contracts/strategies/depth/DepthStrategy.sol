@@ -79,12 +79,14 @@ contract DepthStrategy is IStrategy {
         external
         override
         onlyOwner
+        returns (uint256)
     {
         (address vault, uint256 pid) = getVaultInfo(token);
 
         IPiggyBreeder(piggyBreeder).unStake(pid, amount);
         IDepthVault(vault).withdraw(amount);
         IERC20(token).transfer(owner, amount);
+        return amount;
     }
 
     function claimRewards(address token) external override onlyOwner {

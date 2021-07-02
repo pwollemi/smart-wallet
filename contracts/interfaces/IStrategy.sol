@@ -20,7 +20,7 @@ interface IStrategy {
      * @param token The token to withdraw
      * @param amount The amount to withdraw
      */
-    function withdraw(address token, uint256 amount) external;
+    function withdraw(address token, uint256 amount) external returns (uint256);
 
     /**
      * @notice Withdraw specific amount of rewards

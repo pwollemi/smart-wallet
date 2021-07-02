@@ -4,8 +4,6 @@ pragma solidity ^0.6.9;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "hardhat/console.sol";
-
 interface ISafeBox {
     function bank() external view returns (address);
 
