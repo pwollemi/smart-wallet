@@ -80,7 +80,7 @@ async function depth(globalConfig) {
 }
 
 
-async function deployBooster(source) {
+async function deployBooster(globalConfig, source) {
     const BOOSTER_FILDA = "booster-filda";
     const BOOSTER_CAN = "booster-can";
     const booBankAddr = "0xa61a4f9275ef62d2c076b0933f8a9418cec8c670";
@@ -99,9 +99,9 @@ async function deployBooster(source) {
     await globalConfig.setStrategyFactory(source == "filda" ? BOOSTER_FILDA : BOOSTER_CAN, booStrategyFactory.address);
 }
 
-async function booster() {
-    await deployBooster("filda");
-    await deployBooster("channels");
+async function booster(globalConfig) {
+    await deployBooster(globalConfig, "filda");
+    await deployBooster(globalConfig, "channels");
 }
 
 async function smartwallet() {
@@ -126,8 +126,9 @@ async function smartwallet() {
 
 async function main() {
     const globalConfig = await smartwallet();
-    // await belt(globalConfig);
+    await belt(globalConfig);
     await depth(globalConfig);
+    await booster(globalConfig);
 }
   
 main()

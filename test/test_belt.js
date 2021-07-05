@@ -62,11 +62,11 @@ let beltStrategyFactory;
 let usdtContract;
 
 async function deployContracts() {
-  // const BeltConfig = await ethers.getContractFactory("BeltConfig");
-  // beltConfig = await BeltConfig.deploy(depositor, masterOrbit, lpTokenPoolId);
-  // await beltConfig.deployed();
-  // beltConfigAddr = beltConfig.address;
-  // console.log('Belt Config: ', beltConfigAddr);
+  const BeltConfig = await ethers.getContractFactory("BeltConfig");
+  beltConfig = await BeltConfig.deploy(depositor, masterOrbit, lpTokenPoolId);
+  await beltConfig.deployed();
+  beltConfigAddr = beltConfig.address;
+  console.log('Belt Config: ', beltConfigAddr);
 
   const BeltStrategyFactory = await ethers.getContractFactory("BeltStrategyFactory");
   beltStrategyFactory = await BeltStrategyFactory.deploy(beltConfigAddr);
@@ -74,11 +74,11 @@ async function deployContracts() {
   beltStrategyFactoryAddr = beltStrategyFactory.address;
   console.log('Belt Strategy factory: ', beltStrategyFactoryAddr);
 
-  // const GlobalConfig = await ethers.getContractFactory("GlobalConfig");
-  // globalConfig = await GlobalConfig.deploy();
-  // await globalConfig.deployed();
-  // globalConfigAddr = globalConfig.address;
-  // console.log('Global Config: ', globalConfigAddr);
+  const GlobalConfig = await ethers.getContractFactory("GlobalConfig");
+  globalConfig = await GlobalConfig.deploy();
+  await globalConfig.deployed();
+  globalConfigAddr = globalConfig.address;
+  console.log('Global Config: ', globalConfigAddr);
 
   const SmartWallet = await ethers.getContractFactory("SmartWallet");
   smartWalletImpl = await SmartWallet.deploy();
@@ -113,9 +113,9 @@ describe("Belt", function() {
 
   before(async function() {
     [user] = await ethers.getSigners();
-    // await deployContracts();
+    await deployContracts();
     await getContracts();
-    // await waitTx(globalConfig.connect(user).setStrategyFactory("belt", beltStrategyFactory.address));
+    await waitTx(globalConfig.connect(user).setStrategyFactory("belt", beltStrategyFactory.address));
   });
 
   beforeEach(async function() {
