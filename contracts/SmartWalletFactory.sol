@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
 import "./SmartWallet.sol";
+
 contract SmartWalletFactory is Ownable {
     mapping(address => SmartWallet) public walletStore;
 
@@ -18,8 +19,11 @@ contract SmartWalletFactory is Ownable {
     }
 
     function newSmartWallet(address globalConfig) external returns (address) {
-        SmartWallet smartWallet = SmartWallet(payable(Clones.clone(walletImpl)));
+        SmartWallet smartWallet = SmartWallet(
+            payable(Clones.clone(walletImpl))
+        );
         smartWallet.initialize(globalConfig);
+        smartWallet.transferOwnership(msg.sender);
         walletStore[msg.sender] = smartWallet;
 
         emit WalletCreated(msg.sender, address(smartWallet));

@@ -2,11 +2,11 @@
 
 pragma solidity ^0.6.9;
 
-import "./IStrategy.sol";
+import "../../interfaces/IStrategyFactory.sol";
+import "../../interfaces/IStrategy.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./PtdConfig.sol";
 import "./PtdStrategy.sol";
-import "./IStrategyFactory.sol";
 
 contract PtdStrategyFactory is IStrategyFactory, Ownable {
     PtdConfig public ptdConfig;

@@ -20,7 +20,10 @@ contract PtdConfig {
         governance = msg.sender;
     }
 
-    function setStakingPool(address token, address stakingPool) public onlyGovernance {
+    function setStakingPool(address token, address stakingPool)
+        public
+        onlyGovernance
+    {
         require(stakingPool != address(0), "staking pool cannot be zero");
         pTokenStakingPool[token] = stakingPool;
     }
