@@ -5,59 +5,15 @@ const BN = require('bn.js');
 
 chai.use(solidity);
 chai.use(require('chai-bn')(BN));
-const { assert, expect } = chai;
+const { expect } = chai;
 
-// assets
-const usdt = {
-  symbol: "USDT",
-  address: "0xa71edc38d189767582c38a3145b5873052c3e47a",
-  holder: "0xf977814e90da44bfa03b6295a0616a897441acec",
-  decimals: 18
-};
-const husd = {
-  symbol: "HUSD",
-  address: "0x0298c2b32eae4da002a15f36fdf7615bea3da047",
-  holder: "0xcee6de4290a4002de8712d16f8cfba03cb9afcf4",
-  decimals: 8
-};
+const { impersonateForToken, approve } = require("./helper");
+const { usdt, husd } = require("../info/tokens");
 
-const FILDA = "0xE36FFD17B2661EB57144cEaEf942D95295E637F0";
-const CAN = "0x1e6395E6B059fc97a4ddA925b6c5ebf19E05c69f";
-const BOO = "0xff96dccf2763d512b6038dc60b7e96d1a9142507";
-
-const booBankAddr = "0xa61a4f9275ef62d2c076b0933f8a9418cec8c670";
-const booPoolsAddr = "0xBa92b862ac310D42A8a3DE613dcE917d0d63D98c";
+const { FILDA, CAN, BOO, booPoolsAddr, booBankAddr } = require("../info/booster");
 
 const BOOSTER_FILDA = "booster-filda";
 const BOOSTER_CAN = "booster-can";
-
-async function impersonateForToken(tokenInfo, receiver, amount) {
-  console.log("Impersonating for " + tokenInfo.symbol);
-
-  const token = await ethers.getContractAt("IERC20", tokenInfo.address);
-  await receiver.sendTransaction({
-    to: tokenInfo.holder,
-    value: ethers.utils.parseEther("1.0")
-  });
-
-  await hre.network.provider.request({
-    method: "hardhat_impersonateAccount",
-    params: [tokenInfo.holder]}
-  )
-
-  const signedHolder = await ethers.provider.getSigner(tokenInfo.holder);
-  await token.connect(signedHolder).transfer(receiver.address, ethers.utils.parseUnits(amount, tokenInfo.decimals));
-
-  await hre.network.provider.request({
-    method: "hardhat_stopImpersonatingAccount",
-    params: [tokenInfo.holder]}
-  )
-}
-
-async function approve(tokenInfo, owner, spender) {
-  const token = await ethers.getContractAt("IERC20", tokenInfo.address);
-  await token.connect(owner).approve(spender, ethers.constants.MaxUint256);
-}
 
 // contracts
 let globalConfig;

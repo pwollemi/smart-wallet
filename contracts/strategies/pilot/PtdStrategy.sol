@@ -141,10 +141,11 @@ contract PtdStrategy is IStrategy {
         if (token == address(0)) {
             //HT
             payable(owner).transfer(amount);
-        } else {
-            IERC20(token).transfer(owner, amount);
+            return amount;
         }
-        return amount;
+        uint256 realAmount = IERC20(token).balanceOf(address(this));
+        IERC20(token).transfer(owner, realAmount);
+        return realAmount;
     }
 
     function claimRewards(address token) external override onlyOwner {
